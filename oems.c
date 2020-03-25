@@ -71,7 +71,7 @@ void getHighest (int* A, int Asize, int* B, int Bsize)
 
 int main ()
 {
-	int rank, np, i, j, k ;	
+	int rank, np, i, phase ;	
 	int *local_arr, *recv_arr ;
 
 	local_arr = (int *) malloc (5*sizeof(int)) ;
@@ -82,32 +82,113 @@ int main ()
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank) ;
 
 	int *arr ;
-	arr = (int *) malloc (10 * sizeof(int)) ;
-	arr[0] = 5 ;
-	arr[1] = 9 ;
-	arr[2] = 13 ;
-	arr[3] = 4 ;
-	arr[4] = 0 ;
-	arr[5] = 9 ;
-	arr[6] = 6 ;
-	arr[7] = 7 ;
-	arr[8] = 5 ;
-	arr[9] = 3 ;
+	arr = (int *) malloc (40 * sizeof(int)) ;
 
+	{
+		arr[0] = 18 ;
+		arr[1] = 2 ;
+		arr[2] = 11 ;
+		arr[3] = 28 ;
+		arr[4] = 34 ;
+		arr[5] = 10 ;
+		arr[6] = 14 ;
+		arr[7] = 1 ;
+		arr[8] = 24 ;
+		arr[9] = 27 ;
+		arr[10] = 9 ;
+		arr[11] = 24 ;
+		arr[12] = 14 ;
+		arr[13] = 7 ;
+		arr[14] = 36 ;
+		arr[15] = 1 ;
+		arr[16] = 24 ;
+		arr[17] = 29 ;
+		arr[18] = 3 ;
+		arr[19] = 28 ;
+		arr[20] = 31 ;
+		arr[21] = 36 ;
+		arr[22] = 26 ;
+		arr[23] = 31 ;
+		arr[24] = 34 ;
+		arr[25] = 40 ;
+		arr[26] = 28 ;
+		arr[27] = 30 ;
+		arr[28] = 19 ;
+		arr[29] = 15 ;
+		arr[30] = 25 ;
+		arr[31] = 10 ;
+		arr[32] = 20 ;
+		arr[33] = 9 ;
+		arr[34] = 4 ;
+		arr[35] = 17 ;
+		arr[36] = 15 ;
+		arr[37] = 19 ;
+		arr[38] = 36 ;
+		arr[39] = 2 ;
+	}
 
+	MPI_Scatter (arr, 5, MPI_INT, local_arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
+	qsort (local_arr , 5 , sizeof(int), compare) ;
+
+	for (phase = 0 ; phase < np ; phase++)
+	{
+		if (phase % 2 == 0)
+		{
+			if (rank % 2 == 0)
+			{
+				if (rank + 1 < np)
+				{
+					MPI_Recv (recv_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					MPI_Send (local_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
+					getLowest (local_arr, 5, recv_arr, 5) ;
+				}
+			}
+			else
+			{
+				MPI_Send (local_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
+				MPI_Recv (recv_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+				getHighest (recv_arr, 5, local_arr, 5) ;
+			}
+		}
+		else
+		{
+			if (rank % 2 == 0)
+			{
+				MPI_Send (local_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
+				MPI_Recv (recv_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+				getHighest (recv_arr, 5, local_arr, 5) ;
+			}
+			else
+			{
+				if (rank + 1 < np)
+				{
+					MPI_Recv (recv_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					MPI_Send (local_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
+					getLowest (local_arr, 5, recv_arr, 5) ;
+				}
+			}
+		}
+	}
+
+	MPI_Gather (local_arr, 5, MPI_INT, arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
+	if (rank == 0)
+	{
+		printf ("The list after sorting - \n") ;
+		for (i = 0 ; i < 40 ; i++)
+			printf ("arr[%d] = %d\n", i, arr[i]) ;
+	}
+
+	/*
 	if (rank == 0)
 	{		
 		MPI_Scatter (arr, 5, MPI_INT, local_arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
-		free (arr) ;
 		qsort (local_arr , 5 , sizeof(int), compare) ;
-		
 		
 		MPI_Recv (recv_arr, 5, MPI_INT, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
 		MPI_Send (local_arr, 5, MPI_INT, 1, 0, MPI_COMM_WORLD) ;
 
 		getLowest (local_arr, 5, recv_arr, 5) ;
 
-		arr = (int *) malloc (10 * sizeof(int)) ;
 		MPI_Gather (local_arr, 5, MPI_INT, arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
 
 		printf ("From process 0 after parallel sort - \n") ;
@@ -127,6 +208,7 @@ int main ()
 
 		MPI_Gather (local_arr, 5, MPI_INT, arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
 	}
+	*/
 
 	MPI_Finalize () ;
 
