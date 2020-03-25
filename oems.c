@@ -116,10 +116,12 @@ int main (int argc, char **argv)
 	MPI_Init (NULL, NULL) ;
 	MPI_Comm_size (MPI_COMM_WORLD, &np) ;
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank) ;
+	MPI_Status status ;
 
 	if (rank == 0)
 	{
 		N = readTestLines (argv[1]) ;
+		printf ("N = %d\n", N) ;
 		arr = readTestCase (argv[1], N) ;
 		/*
 		printf ("The array elements are - \n") ;
@@ -142,8 +144,12 @@ int main (int argc, char **argv)
 		rem = N % np ;
 		ceilN = N + (np - rem) ;
 
-		if (rank == ceilN/np - 1)
-			locSize = rem ;
+		if (rank == np - 1)
+		{
+			printf ("UNDIVISIBLE!\n") ;
+			locSize = N - (rank*ceilN/np) ;
+			printf ("localSize = %d\n", locSize) ;
+		}
 		else
 			locSize = ceilN/np ;
 			
@@ -165,18 +171,22 @@ int main (int argc, char **argv)
 			{
 				if (rank + 1 < np)
 				{
-					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
-					MPI_Recv (recv_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
+					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
+					MPI_Get_count (&status, MPI_INT, &recvCount) ;
+
 					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
-					getLowest (local_arr, locSize, recv_arr, locSize) ;
-					//printf (" Successful\n") ;
+					getLowest (local_arr, locSize, recv_arr, recvCount) ;
+					printf (" Successful %d = %d <---> %d\n", phase, rank, rank+1) ;
 				}
 			}
 			else
 			{
 				MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
-				MPI_Recv (recv_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-				getHighest (recv_arr, locSize, local_arr, locSize) ;
+				MPI_Recv (recv_arr, recvSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status) ;
+				MPI_Get_count (&status, MPI_INT, &recvCount) ;
+
+				getHighest (recv_arr, recvCount, local_arr, locSize) ;
 			}
 		}
 		else
@@ -186,8 +196,10 @@ int main (int argc, char **argv)
 				if (rank - 1 >= 0)
 				{
 					MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
-					MPI_Recv (recv_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-					getHighest (recv_arr, locSize, local_arr, locSize) ;
+					MPI_Recv (recv_arr, recvSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status) ;
+					MPI_Get_count (&status, MPI_INT, &recvCount) ;
+
+					getHighest (recv_arr, recvCount, local_arr, locSize) ;
 				}
 			}
 			else
@@ -195,10 +207,12 @@ int main (int argc, char **argv)
 				if (rank + 1 < np)
 				{
 					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
-					MPI_Recv (recv_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
+					MPI_Get_count (&status, MPI_INT, &recvCount) ;
+
 					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
-					getLowest (local_arr, locSize, recv_arr, locSize) ;
-					//printf (" Successful\n") ;
+					getLowest (local_arr, locSize, recv_arr, recvCount) ;
+					printf (" Successful %d = %d <---> %d\n\n", phase, rank, rank+1) ;
 				}
 			}
 		}
