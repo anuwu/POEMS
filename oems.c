@@ -111,7 +111,7 @@ int main (int argc, char **argv)
 {
 	int rank, np, i, phase, N ;	
 	int *local_arr, *recv_arr, *arr ;
-	int locSize = 5 , recvSize = 5 , recvCount ;
+	int locSize , recvSize , recvCount ;
 
 	MPI_Init (NULL, NULL) ;
 	MPI_Comm_size (MPI_COMM_WORLD, &np) ;
@@ -146,21 +146,21 @@ int main (int argc, char **argv)
 
 		if (rank == np - 1)
 		{
-			printf ("UNDIVISIBLE!\n") ;
+			//printf ("UNDIVISIBLE! ") ;
 			locSize = N - (rank*ceilN/np) ;
-			printf ("localSize = %d\n", locSize) ;
 		}
 		else
 			locSize = ceilN/np ;
 			
 		recvSize = ceilN/np ;
+		//printf ("%d localSize = %d, recvSize = %d\n", rank, locSize, recvSize) ;
 	}
 
 	local_arr = (int *) malloc (locSize*sizeof(int)) ;
 	recv_arr = (int *) malloc (recvSize*sizeof(int)) ;
 
 
-	MPI_Scatter (arr, locSize, MPI_INT, local_arr, locSize, MPI_INT, 0, MPI_COMM_WORLD) ;
+	MPI_Scatter (arr, locSize, MPI_INT, local_arr, recvSize, MPI_INT, 0, MPI_COMM_WORLD) ;
 	qsort (local_arr , locSize , sizeof(int), compare) ;
 
 	for (phase = 0 ; phase < np ; phase++)
@@ -171,13 +171,13 @@ int main (int argc, char **argv)
 			{
 				if (rank + 1 < np)
 				{
-					printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
+					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
 					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
 					MPI_Get_count (&status, MPI_INT, &recvCount) ;
 
 					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
 					getLowest (local_arr, locSize, recv_arr, recvCount) ;
-					printf (" Successful %d = %d <---> %d\n", phase, rank, rank+1) ;
+					//printf (" Successful %d = %d <---> %d\n", phase, rank, rank+1) ;
 				}
 			}
 			else
@@ -212,7 +212,7 @@ int main (int argc, char **argv)
 
 					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
 					getLowest (local_arr, locSize, recv_arr, recvCount) ;
-					printf (" Successful %d = %d <---> %d\n\n", phase, rank, rank+1) ;
+					//printf (" Successful %d = %d <---> %d\n\n", phase, rank, rank+1) ;
 				}
 			}
 		}
@@ -222,9 +222,13 @@ int main (int argc, char **argv)
 
 	if (rank == 0)
 	{
+		FILE *outfp ;
+		outfp = fopen ("sorted.txt", "w") ;
 		printf ("The list after sorting - \n") ;
 		for (i = 0 ; i < N ; i++)
-			printf ("arr[%d] = %d\n", i, arr[i]) ;
+			fprintf (outfp, "%d\n", arr[i]) ;
+
+		fclose (outfp) ;
 	}
 
 	MPI_Finalize () ;
