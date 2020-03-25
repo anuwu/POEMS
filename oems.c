@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int compare (const void* a, const void* b)
 {
@@ -69,64 +70,89 @@ void getHighest (int* A, int Asize, int* B, int Bsize)
 	}
 }
 
+int* readTestCase (char *filename, int line)
+{
+	FILE *fp ;
+	char buf[20] ;
+	int i ;
+	int *arr ;
+
+	fp = fopen (filename , "r") ;
+	arr = (int *) malloc (line * sizeof(int)) ;
+
+	i = 0 ;
+	while (fgets (buf, 20, fp) != NULL)
+	{
+		buf[strlen(buf)-1] = '\0' ;
+		arr[i] = atoi (buf) ;
+		i++ ;
+	}
+	fclose (fp) ;
+
+	return arr ;
+}
+
+int readTestLines (char *filename)
+{
+	FILE *fp ;
+	char buf[20] ;
+	int line = 0 ;
+
+	fp = fopen (filename , "r") ;
+	while (fgets (buf, 20, fp) != NULL)
+		line++ ;
+
+	return line ;
+
+	fclose (fp) ;
+}
+
 int main (int argc, char **argv)
 {
-	int rank, np, i, phase ;	
-	int *local_arr, *recv_arr ;
-	int locSize = 5 ;
-
-	local_arr = (int *) malloc (locSize*sizeof(int)) ;
-	recv_arr = (int *) malloc (locSize*sizeof(int)) ;
+	int rank, np, i, phase, N ;	
+	int *local_arr, *recv_arr, *arr ;
+	int locSize = 5 , recvSize = 5 , recvCount ;
 
 	MPI_Init (NULL, NULL) ;
 	MPI_Comm_size (MPI_COMM_WORLD, &np) ;
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank) ;
 
-	int *arr ;
-	arr = (int *) malloc (40 * sizeof(int)) ;
-
+	if (rank == 0)
 	{
-		arr[0] = 18 ;
-		arr[1] = 2 ;
-		arr[2] = 11 ;
-		arr[3] = 28 ;
-		arr[4] = 34 ;
-		arr[5] = 10 ;
-		arr[6] = 14 ;
-		arr[7] = 1 ;
-		arr[8] = 24 ;
-		arr[9] = 27 ;
-		arr[10] = 9 ;
-		arr[11] = 24 ;
-		arr[12] = 14 ;
-		arr[13] = 7 ;
-		arr[14] = 36 ;
-		arr[15] = 1 ;
-		arr[16] = 24 ;
-		arr[17] = 29 ;
-		arr[18] = 3 ;
-		arr[19] = 28 ;
-		arr[20] = 31 ;
-		arr[21] = 36 ;
-		arr[22] = 26 ;
-		arr[23] = 31 ;
-		arr[24] = 34 ;
-		arr[25] = 40 ;
-		arr[26] = 28 ;
-		arr[27] = 30 ;
-		arr[28] = 19 ;
-		arr[29] = 15 ;
-		arr[30] = 25 ;
-		arr[31] = 10 ;
-		arr[32] = 20 ;
-		arr[33] = 9 ;
-		arr[34] = 4 ;
-		arr[35] = 17 ;
-		arr[36] = 15 ;
-		arr[37] = 19 ;
-		arr[38] = 36 ;
-		arr[39] = 2 ;
+		N = readTestLines (argv[1]) ;
+		arr = readTestCase (argv[1], N) ;
+		/*
+		printf ("The array elements are - \n") ;
+		for (int i = 0 ; i < N ; i++)
+			printf ("arr[%d] = %d\n", i, arr[i]) ;
+		*/
 	}
+
+	MPI_Bcast (&N, 	1, MPI_INT, 0, MPI_COMM_WORLD) ;
+	//printf ("Got N as %d by %d\n", N, rank) ;
+
+	if (N % np == 0)
+	{
+		locSize = N/np ;
+		recvSize = N/np ;
+	}
+	else
+	{
+		int rem, ceilN ;
+		rem = N % np ;
+		ceilN = N + (np - rem) ;
+
+		if (rank == ceilN/np - 1)
+			locSize = rem ;
+		else
+			locSize = ceilN/np ;
+			
+		recvSize = ceilN/np ;
+	}
+
+	local_arr = (int *) malloc (locSize*sizeof(int)) ;
+	recv_arr = (int *) malloc (recvSize*sizeof(int)) ;
+
 
 	MPI_Scatter (arr, locSize, MPI_INT, local_arr, locSize, MPI_INT, 0, MPI_COMM_WORLD) ;
 	qsort (local_arr , locSize , sizeof(int), compare) ;
@@ -183,7 +209,7 @@ int main (int argc, char **argv)
 	if (rank == 0)
 	{
 		printf ("The list after sorting - \n") ;
-		for (i = 0 ; i < 40 ; i++)
+		for (i = 0 ; i < N ; i++)
 			printf ("arr[%d] = %d\n", i, arr[i]) ;
 	}
 
