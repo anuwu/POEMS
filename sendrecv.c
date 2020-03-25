@@ -76,61 +76,82 @@ int main (int argc, char **argv)
 
 		if (lastrank*recvSize == N)
 			lastrank-- ;
-
-		if (rank*recvSize >= N)
-		{
-			locSize = 0 ;
-			/*
-			if (rank*recvSize - N < recvSize)
-			{
-				lastrank = rank - 1 ;
-				printf ("IF1 LAST USEFUL RANK = %d\n", lastrank) ;
-
-			}
-			*/
-		}
-		else
-		{
-			if (N - rank*recvSize <= recvSize)
-			{
-				locSize = N - rank*recvSize ;
-				/*
-				if (rank == np - 1)
-				{
-					lastrank = rank ;
-					printf ("IF2 LAST USEFUL RANK = %d\n", lastrank) ;
-				}
-				*/
-			}
-			else
-				locSize = recvSize ;
-		}
-
-		/*
-		if (rank == np - 1)
-		{
-			//printf ("UNDIVISIBLE! ") ;
-			locSize = N - (rank*ceilN/np) ;
-		}
-		else
-			locSize = ceilN/np ;
-		*/
-			
-		//printf ("Rank = %d, localSize = %d, recvSize = %d\n", rank, locSize, recvSize) ;
 	}
-
-	local_arr = (int *) malloc (locSize*sizeof(int)) ;
-	recv_arr = (int *) malloc (recvSize*sizeof(int)) ;
-	MPI_Scatter (arr, locSize, MPI_INT, local_arr, recvSize, MPI_INT, 0, MPI_COMM_WORLD) ;
-
-	//printf ("%d localSize = %d, recvSize = %d\n", rank, locSize, recvSize) ;
-	printf ("For rank %d, elements - ", rank) ;
-	for (i = 0 ; i < locSize ; i++)
-		printf ("%d, ", local_arr[i]) ;
-	printf ("\n") ;
 
 	if (rank == 0)
 		printf ("Last useful rank = %d\n", lastrank) ;
+
+	MPI_Comm FINAL_WORLD;
+
+	
+	//Without trimming
+	{
+		FINAL_WORLD = MPI_COMM_WORLD ;
+		if (rank > lastrank)
+			locSize = 0 ;
+		else if (rank < lastrank)
+			locSize = recvSize ;
+		else
+		{
+			if (N - (rank+1)*recvSize == 0)
+				locSize = recvSize ;
+			else
+				locSize = N - rank*recvSize ;
+		}
+	}
+
+	/*
+	//With trimming
+	{
+		if (lastrank == np - 1)
+			FINAL_WORLD = MPI_COMM_WORLD ;
+		else
+		{
+			//printf ("%d TRIMMING COMM\n", rank) ;
+			MPI_Group world_group, final_group ;
+			MPI_Comm_group (MPI_COMM_WORLD, &world_group) ;
+
+			//printf ("%d TRIMMING COMM  post MPI_Comm_group\n", rank) ;
+			int ranges[1][3] = {lastrank + 1, np, 1 };
+			MPI_Group_range_excl(world_group, 1, ranges, &final_group);
+			printf ("%d TRIMMING COMM  post MPI_Group_range_excl\n", rank) ;
+
+			MPI_Comm_create (MPI_COMM_WORLD, final_group, &FINAL_WORLD);
+		}
+
+		if (rank == lastrank)
+		{
+			if (N - (rank+1)*recvSize == 0)
+				locSize = recvSize ;
+			else
+				locSize = N - rank*recvSize ;
+		}
+		else
+			locSize = recvSize ;
+	}
+	*/
+	
+	/*
+		if (rank*recvSize >= N)
+		locSize = 0 ;
+		else
+		{
+			if (N - rank*recvSize <= recvSize)
+				locSize = N - rank*recvSize ;
+			else
+				locSize = recvSize ;
+		}
+	*/
+
+	local_arr = (int *) malloc (locSize*sizeof(int)) ;
+	recv_arr = (int *) malloc (recvSize*sizeof(int)) ;
+	MPI_Scatter (arr, locSize, MPI_INT, local_arr, recvSize, MPI_INT, 0, FINAL_WORLD) ;
+
+	//printf ("%d localSize = %d, recvSize = %d\n", rank, locSize, recvSize) ;
+	printf ("For rank %d, locSize = %d and - ", rank, locSize) ;
+	for (i = 0 ; i < locSize ; i++)
+		printf ("%d, ", local_arr[i]) ;
+	printf ("\n") ;
 
 	MPI_Finalize () ;
 

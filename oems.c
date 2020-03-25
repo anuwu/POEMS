@@ -8,7 +8,7 @@ int compare (const void* a, const void* b)
 	return (*(int *)a - *(int *)b) ;
 }
 
-void insert (int *arr, int size, int ele)
+void insertBack (int *arr, int size, int ele)
 {
 	size = size - 2 ;
 	while (size >= 0 && arr[size] > ele)
@@ -25,15 +25,7 @@ void getLowest (int* A, int Asize, int *B, int Bsize)
 	int count = 1 ;
 	while (j < Bsize && count <= Asize && B[j] < A[Asize-1])
 	{
-		insert (A,  Asize, B[j]) ;
-
-		/*
-		printf ("After merging %d, j = %d,\nthe array is - ", B[j], j) ;
-		for (int i = 0 ; i < Asize ; i++)
-			printf ("%d, ", A[i]) ;
-		printf ("\n") ;
-		*/
-		
+		insertBack (A,  Asize, B[j]) ;	
 		j++ ;
 		count++ ;
 	}
@@ -56,15 +48,7 @@ void getHighest (int* A, int Asize, int* B, int Bsize)
 	int count = 1 ;
 	while (i >= 0 && count <= Bsize && A[i] > B[0])
 	{
-		insertFront (B,  Bsize, A[i]) ;
-
-		/*
-		printf ("After merging %d, \nthe array is - ", A[i]) ;
-		for (int j = 0 ; j < Bsize ; j++)
-			printf ("%d, ", B[j]) ;
-		printf ("\n") ;
-		*/
-		
+		insertFront (B,  Bsize, A[i]) ;		
 		i-- ;
 		count++ ;
 	}
@@ -109,7 +93,7 @@ int readTestLines (char *filename)
 
 int main (int argc, char **argv)
 {
-	int rank, np, i, phase, N ;	
+	int rank, np, i, phase, N, lastrank;	
 	int *local_arr, *recv_arr, *arr ;
 	int locSize , recvSize , recvCount ;
 
@@ -123,38 +107,43 @@ int main (int argc, char **argv)
 		N = readTestLines (argv[1]) ;
 		printf ("N = %d\n", N) ;
 		arr = readTestCase (argv[1], N) ;
-		/*
-		printf ("The array elements are - \n") ;
-		for (int i = 0 ; i < N ; i++)
-			printf ("arr[%d] = %d\n", i, arr[i]) ;
-		*/
+
 	}
 
 	MPI_Bcast (&N, 	1, MPI_INT, 0, MPI_COMM_WORLD) ;
-	//printf ("Got N as %d by %d\n", N, rank) ;
 
 	if (N % np == 0)
 	{
 		locSize = N/np ;
 		recvSize = N/np ;
+		lastrank = np-1 ;
 	}
 	else
 	{
 		int rem, ceilN ;
 		rem = N % np ;
 		ceilN = N + (np - rem) ;
-
-		if (rank == np - 1)
-		{
-			//printf ("UNDIVISIBLE! ") ;
-			locSize = N - (rank*ceilN/np) ;
-		}
-		else
-			locSize = ceilN/np ;
-			
 		recvSize = ceilN/np ;
-		//printf ("%d localSize = %d, recvSize = %d\n", rank, locSize, recvSize) ;
+		lastrank = N/recvSize ;
+
+		if (lastrank*recvSize == N)
+			lastrank-- ;
+
+		if (rank > lastrank)
+			locSize = 1 ;
+		else if (rank < lastrank)
+			locSize = recvSize ;
+		else
+		{
+			if (N - (rank+1)*recvSize == 0)
+				locSize = recvSize ;
+			else
+				locSize = N - rank*recvSize ;
+		}
 	}
+
+	if (rank == 0)
+		printf ("Last useful rank = %d\n", lastrank) ;
 
 	local_arr = (int *) malloc (locSize*sizeof(int)) ;
 	recv_arr = (int *) malloc (recvSize*sizeof(int)) ;
@@ -163,37 +152,26 @@ int main (int argc, char **argv)
 	MPI_Scatter (arr, locSize, MPI_INT, local_arr, recvSize, MPI_INT, 0, MPI_COMM_WORLD) ;
 	qsort (local_arr , locSize , sizeof(int), compare) ;
 
-	for (phase = 0 ; phase < np ; phase++)
+	if (rank <= lastrank)
 	{
-		if (phase % 2 == 0)
+		for (phase = 0 ; phase <= lastrank ; phase++)
 		{
-			if (rank % 2 == 0)
+			if (phase % 2 == 0)
 			{
-				if (rank + 1 < np)
+				if (rank % 2 == 0)
 				{
-					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
-					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
-					MPI_Get_count (&status, MPI_INT, &recvCount) ;
+					if (rank + 1 <= lastrank)
+					{
+						printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
+						MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
+						MPI_Get_count (&status, MPI_INT, &recvCount) ;
 
-					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
-					getLowest (local_arr, locSize, recv_arr, recvCount) ;
-					//printf (" Successful %d = %d <---> %d\n", phase, rank, rank+1) ;
+						MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
+						getLowest (local_arr, locSize, recv_arr, recvCount) ;
+						printf (" Successful %d = %d <---> %d\n", phase, rank, rank+1) ;
+					}
 				}
-			}
-			else
-			{
-				MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
-				MPI_Recv (recv_arr, recvSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status) ;
-				MPI_Get_count (&status, MPI_INT, &recvCount) ;
-
-				getHighest (recv_arr, recvCount, local_arr, locSize) ;
-			}
-		}
-		else
-		{
-			if (rank % 2 == 0)
-			{
-				if (rank - 1 >= 0)
+				else
 				{
 					MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
 					MPI_Recv (recv_arr, recvSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status) ;
@@ -204,21 +182,38 @@ int main (int argc, char **argv)
 			}
 			else
 			{
-				if (rank + 1 < np)
+				if (rank % 2 == 0)
 				{
-					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
-					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
-					MPI_Get_count (&status, MPI_INT, &recvCount) ;
+					if (rank - 1 >= 0)
+					{
+						MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
+						MPI_Recv (recv_arr, recvSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status) ;
+						MPI_Get_count (&status, MPI_INT, &recvCount) ;
 
-					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
-					getLowest (local_arr, locSize, recv_arr, recvCount) ;
-					//printf (" Successful %d = %d <---> %d\n\n", phase, rank, rank+1) ;
+						getHighest (recv_arr, recvCount, local_arr, locSize) ;
+					}
+				}
+				else
+				{
+					if (rank + 1 <= lastrank)
+					{
+						printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
+						MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, &status) ;
+						MPI_Get_count (&status, MPI_INT, &recvCount) ;
+
+						MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
+						getLowest (local_arr, locSize, recv_arr, recvCount) ;
+						printf (" Successful %d = %d <---> %d\n", phase, rank, rank+1) ;
+					}
 				}
 			}
 		}
 	}
 
+	//printf ("%d is stuck before gather %d\n", rank, locSize) ;
 	MPI_Gather (local_arr, locSize, MPI_INT, arr, locSize, MPI_INT, 0, MPI_COMM_WORLD) ;
+	//printf ("%d after gather\n", rank) ;
+	MPI_Finalize () ;
 
 	if (rank == 0)
 	{
@@ -230,8 +225,6 @@ int main (int argc, char **argv)
 
 		fclose (outfp) ;
 	}
-
-	MPI_Finalize () ;
 
 	return 0 ;
 }
