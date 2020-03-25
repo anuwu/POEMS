@@ -69,13 +69,14 @@ void getHighest (int* A, int Asize, int* B, int Bsize)
 	}
 }
 
-int main ()
+int main (int argc, char **argv)
 {
 	int rank, np, i, phase ;	
 	int *local_arr, *recv_arr ;
+	int locSize = 5 ;
 
-	local_arr = (int *) malloc (5*sizeof(int)) ;
-	recv_arr = (int *) malloc (5*sizeof(int)) ;
+	local_arr = (int *) malloc (locSize*sizeof(int)) ;
+	recv_arr = (int *) malloc (locSize*sizeof(int)) ;
 
 	MPI_Init (NULL, NULL) ;
 	MPI_Comm_size (MPI_COMM_WORLD, &np) ;
@@ -127,8 +128,8 @@ int main ()
 		arr[39] = 2 ;
 	}
 
-	MPI_Scatter (arr, 5, MPI_INT, local_arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
-	qsort (local_arr , 5 , sizeof(int), compare) ;
+	MPI_Scatter (arr, locSize, MPI_INT, local_arr, locSize, MPI_INT, 0, MPI_COMM_WORLD) ;
+	qsort (local_arr , locSize , sizeof(int), compare) ;
 
 	for (phase = 0 ; phase < np ; phase++)
 	{
@@ -138,77 +139,53 @@ int main ()
 			{
 				if (rank + 1 < np)
 				{
-					MPI_Recv (recv_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-					MPI_Send (local_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
-					getLowest (local_arr, 5, recv_arr, 5) ;
+					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
+					MPI_Recv (recv_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
+					getLowest (local_arr, locSize, recv_arr, locSize) ;
+					//printf (" Successful\n") ;
 				}
 			}
 			else
 			{
-				MPI_Send (local_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
-				MPI_Recv (recv_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-				getHighest (recv_arr, 5, local_arr, 5) ;
+				MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
+				MPI_Recv (recv_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+				getHighest (recv_arr, locSize, local_arr, locSize) ;
 			}
 		}
 		else
 		{
 			if (rank % 2 == 0)
 			{
-				MPI_Send (local_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
-				MPI_Recv (recv_arr, 5, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-				getHighest (recv_arr, 5, local_arr, 5) ;
+				if (rank - 1 >= 0)
+				{
+					MPI_Send (local_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD) ;
+					MPI_Recv (recv_arr, locSize, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					getHighest (recv_arr, locSize, local_arr, locSize) ;
+				}
 			}
 			else
 			{
 				if (rank + 1 < np)
 				{
-					MPI_Recv (recv_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-					MPI_Send (local_arr, 5, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
-					getLowest (local_arr, 5, recv_arr, 5) ;
+					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
+					MPI_Recv (recv_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
+					MPI_Send (local_arr, locSize, MPI_INT, rank+1, 0, MPI_COMM_WORLD) ;
+					getLowest (local_arr, locSize, recv_arr, locSize) ;
+					//printf (" Successful\n") ;
 				}
 			}
 		}
 	}
 
-	MPI_Gather (local_arr, 5, MPI_INT, arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
+	MPI_Gather (local_arr, locSize, MPI_INT, arr, locSize, MPI_INT, 0, MPI_COMM_WORLD) ;
+
 	if (rank == 0)
 	{
 		printf ("The list after sorting - \n") ;
 		for (i = 0 ; i < 40 ; i++)
 			printf ("arr[%d] = %d\n", i, arr[i]) ;
 	}
-
-	/*
-	if (rank == 0)
-	{		
-		MPI_Scatter (arr, 5, MPI_INT, local_arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
-		qsort (local_arr , 5 , sizeof(int), compare) ;
-		
-		MPI_Recv (recv_arr, 5, MPI_INT, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-		MPI_Send (local_arr, 5, MPI_INT, 1, 0, MPI_COMM_WORLD) ;
-
-		getLowest (local_arr, 5, recv_arr, 5) ;
-
-		MPI_Gather (local_arr, 5, MPI_INT, arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
-
-		printf ("From process 0 after parallel sort - \n") ;
-		for (i = 0 ; i < 10 ; i++)
-			printf ("arr[%d] = %d\n", i, arr[i]) ;
-	}
-	else
-	{
-		MPI_Scatter (arr, 5, MPI_INT, local_arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
-		qsort (local_arr , 5 , sizeof(int), compare) ;
-
-		
-		MPI_Send (local_arr, 5, MPI_INT, 0, 0, MPI_COMM_WORLD) ;
-		MPI_Recv (recv_arr, 5, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE) ;
-
-		getHighest (recv_arr, 5, local_arr, 5) ;
-
-		MPI_Gather (local_arr, 5, MPI_INT, arr, 5, MPI_INT, 0, MPI_COMM_WORLD) ;
-	}
-	*/
 
 	MPI_Finalize () ;
 
