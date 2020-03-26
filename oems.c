@@ -91,6 +91,24 @@ int readTestLines (char *filename)
 	fclose (fp) ;
 }
 
+MPI_Comm Bcast_LastRank (int N, int np, int *locSize, int *recvSize, int *lastrank)
+{
+	if (N % np == 0)
+	{
+		*lastrank = np-1 ;
+
+	}
+
+	int rem, ceilN ;
+	rem = N % np ;
+	ceilN = N + (np - rem) ;
+	*recvSize = ceilN/np ;
+	*lastrank = N/(*recvSize) ;
+
+	if ((*lastrank)*(*recvSize) == N)
+		(*lastrank)-- ;
+}
+
 int main (int argc, char **argv)
 {
 	int rank, np, i, phase, N, lastrank;	
@@ -107,11 +125,12 @@ int main (int argc, char **argv)
 		N = readTestLines (argv[1]) ;
 		printf ("N = %d\n", N) ;
 		arr = readTestCase (argv[1], N) ;
-
 	}
 
 	MPI_Bcast (&N, 	1, MPI_INT, 0, MPI_COMM_WORLD) ;
+	MPI_Comm TRIM_WORLD
 
+	/*
 	if (N % np == 0)
 	{
 		locSize = N/np ;
@@ -120,17 +139,13 @@ int main (int argc, char **argv)
 	}
 	else
 	{
-		int rem, ceilN ;
-		rem = N % np ;
-		ceilN = N + (np - rem) ;
-		recvSize = ceilN/np ;
-		lastrank = N/recvSize ;
-
-		if (lastrank*recvSize == N)
-			lastrank-- ;
+		findLastRank (N, np, &recvSize, &lastrank) ;
 
 		if (rank > lastrank)
-			locSize = 1 ;
+		{
+			MPI_Finalize ()
+			return 0 ;
+		}
 		else if (rank < lastrank)
 			locSize = recvSize ;
 		else
@@ -141,6 +156,7 @@ int main (int argc, char **argv)
 				locSize = N - rank*recvSize ;
 		}
 	}
+	*/
 
 	if (rank == lastrank)
 		printf ("Last useful rank = %d and locSize = %d and recvSize = %d\n", lastrank, locSize, recvSize) ;
