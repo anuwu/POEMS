@@ -92,11 +92,11 @@ int readTestLines (char *filename)
 }
 
 
-void getLastRank_recvSize (int N, int np, int *recvSize, int *lastrank)
+void getLastRank_recvSize (int N, int np, int *recvSize, int *lastRank)
 {
 	if (N % np == 0)
 	{
-		*lastrank = np-1 ;
+		*lastRank = np-1 ;
 		*recvSize = N/np ;
 	}
 	else
@@ -105,14 +105,14 @@ void getLastRank_recvSize (int N, int np, int *recvSize, int *lastrank)
 		rem = N % np ;
 		ceilN = N + (np - rem) ;
 		*recvSize = ceilN/np ;
-		*lastrank = N/(*recvSize) ;
+		*lastRank = N/(*recvSize) ;
 
-		if ((*lastrank)*(*recvSize) == N)
-			(*lastrank)-- ;
+		if ((*lastRank)*(*recvSize) == N)
+			(*lastRank)-- ;
 	}
 }
 
-void getlocSize_killWorkingComm (int rank, int lastrank, int np, int recvSize, int N, int *locSize, MPI_Comm WORLD, MPI_Comm *PTR_COMM_WORKING)
+void getlocSize_killWorkingComm (int rank, int lastRank, int np, int recvSize, int N, int *locSize, MPI_Comm WORLD, MPI_Comm *PTR_COMM_WORKING)
 {
 	if (N % np == 0)
 	{
@@ -121,26 +121,26 @@ void getlocSize_killWorkingComm (int rank, int lastrank, int np, int recvSize, i
 	}
 	else
 	{
-		if (lastrank == np - 1)
+		if (lastRank == np - 1)
 			*PTR_COMM_WORKING = WORLD ;
 		else
 		{
 			MPI_Group world_group, working_group ;
 			MPI_Comm_group (WORLD, &world_group) ;
 
-			int ranges[1][3] = {lastrank + 1 , np - 1, 1};
+			int ranges[1][3] = {lastRank + 1 , np - 1, 1};
 			MPI_Group_range_excl(world_group, 1, ranges, &working_group);
 
 			MPI_Comm_create (MPI_COMM_WORLD, working_group, PTR_COMM_WORKING);
 		}
 
-		if (rank > lastrank)
+		if (rank > lastRank)
 		{
 			//printf ("Rank %d got killed \n", rank) ;
 			MPI_Finalize () ;
 			exit (0) ;
 		}
-		else if (rank < lastrank)
+		else if (rank < lastRank)
 			*locSize = recvSize ;
 		else
 		{
@@ -156,7 +156,7 @@ void getlocSize_killWorkingComm (int rank, int lastrank, int np, int recvSize, i
 
 int main (int argc, char **argv)
 {
-	int rank, np, i, phase, N, lastrank;	
+	int rank, np, i, phase, N, lastRank ;	
 	int *local_arr, *recv_arr, *arr ;
 	int locSize , recvSize , recvCount ;
 
@@ -171,16 +171,16 @@ int main (int argc, char **argv)
 		printf ("Number of lines in testcase = %d\n", N) ;
 		arr = readTestCase (argv[1], N) ;
 
-		getLastRank_recvSize (N, np, &recvSize, &lastrank) ;
+		getLastRank_recvSize (N, np, &recvSize, &lastRank) ;
 	}
 
 	MPI_Bcast (&N, 	1, MPI_INT, 0, MPI_COMM_WORLD) ;
 	MPI_Bcast (&recvSize, 1 , MPI_INT, 0, MPI_COMM_WORLD) ;
-	MPI_Bcast (&lastrank, 1, MPI_INT, 0, MPI_COMM_WORLD) ;
+	MPI_Bcast (&lastRank, 1, MPI_INT, 0, MPI_COMM_WORLD) ;
 
 	MPI_Comm COMM_WORKING ;
 	//printf ("Rank %d entering killing zone ...... ", rank) ;
-	getlocSize_killWorkingComm (rank, lastrank, np, recvSize, N, &locSize, MPI_COMM_WORLD, &COMM_WORKING) ;
+	getlocSize_killWorkingComm (rank, lastRank, np, recvSize, N, &locSize, MPI_COMM_WORLD, &COMM_WORKING) ;
 
 	local_arr = (int *) malloc (locSize*sizeof(int)) ;
 	recv_arr = (int *) malloc (recvSize*sizeof(int)) ;
@@ -188,13 +188,13 @@ int main (int argc, char **argv)
 	MPI_Scatter (arr, locSize, MPI_INT, local_arr, recvSize, MPI_INT, 0, COMM_WORKING) ;
 	qsort (local_arr , locSize , sizeof(int), compare) ;
 
-	for (phase = 0 ; phase <= lastrank ; phase++)
+	for (phase = 0 ; phase <= lastRank ; phase++)
 	{
 		if (phase % 2 == 0)
 		{
 			if (rank % 2 == 0)
 			{
-				if (rank + 1 <= lastrank)
+				if (rank + 1 <= lastRank)
 				{
 					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
 					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, COMM_WORKING, &status) ;
@@ -229,7 +229,7 @@ int main (int argc, char **argv)
 			}
 			else
 			{
-				if (rank + 1 <= lastrank)
+				if (rank + 1 <= lastRank)
 				{
 					//printf ("Phase %d = %d <---> %d", phase, rank, rank+1) ;
 					MPI_Recv (recv_arr, recvSize, MPI_INT, rank+1, 0, COMM_WORKING, &status) ;
