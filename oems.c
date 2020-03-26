@@ -91,22 +91,36 @@ int readTestLines (char *filename)
 	fclose (fp) ;
 }
 
-MPI_Comm Bcast_LastRank (int N, int np, int *locSize, int *recvSize, int *lastrank)
+void Bcast_LastRank (int N, int np, MPI_Comm WORLD, *MPI_Comm PTR_COMM_WORKING int *recvSize, int *lastrank)
 {
 	if (N % np == 0)
 	{
 		*lastrank = np-1 ;
-
+		*recvSize = N/np ;
+		*PTR_COMM_WORKING = WORLD ;
 	}
+	else
+	{
+		int rem, ceilN ;
+		rem = N % np ;
+		ceilN = N + (np - rem) ;
+		*recvSize = ceilN/np ;
+		*lastrank = N/(*recvSize) ;
 
-	int rem, ceilN ;
-	rem = N % np ;
-	ceilN = N + (np - rem) ;
-	*recvSize = ceilN/np ;
-	*lastrank = N/(*recvSize) ;
+		if ((*lastrank)*(*recvSize) == N)
+			(*lastrank)-- ;
 
-	if ((*lastrank)*(*recvSize) == N)
-		(*lastrank)-- ;
+		MPI_Group world_group, working_group ;
+		MPI_Comm_group (WORLD, &world_group) ;
+		int ranges[1][3] = {*lastrank + 1 , np - 1, 1};
+		MPI_Group_range_excl(world_group, 1, ranges, &working_group);
+		MPI_Comm_create (MPI_COMM_WORLD, working_group, PTR_COMM_WORKING);
+	}
+}
+
+void getLastRank_recvSize (int N, int np, int *recvSize, int *lastrank)
+{
+	
 }
 
 int main (int argc, char **argv)
@@ -128,7 +142,9 @@ int main (int argc, char **argv)
 	}
 
 	MPI_Bcast (&N, 	1, MPI_INT, 0, MPI_COMM_WORLD) ;
-	MPI_Comm TRIM_WORLD
+	MPI_Comm COMM_WORKING ;
+
+	Bcast_LastRank (N, np, MPI_COMM_WORLD, &COMM_WORKING, &recvSize, &lastrank) ;
 
 	/*
 	if (N % np == 0)
